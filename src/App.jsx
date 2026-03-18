@@ -10,17 +10,19 @@ const firebaseConfig = {
   messagingSenderId: "794871946224",
   appId: "1:794871946224:web:848f37aca0c325b87b9b35",
   measurementId: "G-JTNCVFDZN7"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+}
 
 const hasFirebaseConfig = Boolean(
-  firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId && firebaseConfig.appId
+  firebaseConfig.apiKey &&
+    firebaseConfig.authDomain &&
+    firebaseConfig.projectId &&
+    firebaseConfig.appId
 )
 
-const app = hasFirebaseConfig ? (getApps().length ? getApps()[0] : initializeApp(firebaseConfig)) : null
+const app = hasFirebaseConfig
+  ? (getApps().length ? getApps()[0] : initializeApp(firebaseConfig))
+  : null
+
 const db = app ? getFirestore(app) : null
 
 const initialMembers = [
@@ -61,7 +63,14 @@ function isActive(endDate) {
 
 function readLocalData() {
   const raw = localStorage.getItem(STORAGE_KEY)
-  if (!raw) return { members: initialMembers, payments: initialPayments, settings: initialSettings }
+  if (!raw) {
+    return {
+      members: initialMembers,
+      payments: initialPayments,
+      settings: initialSettings,
+    }
+  }
+
   try {
     const parsed = JSON.parse(raw)
     return {
@@ -70,7 +79,11 @@ function readLocalData() {
       settings: { ...initialSettings, ...(parsed.settings || {}) },
     }
   } catch {
-    return { members: initialMembers, payments: initialPayments, settings: initialSettings }
+    return {
+      members: initialMembers,
+      payments: initialPayments,
+      settings: initialSettings,
+    }
   }
 }
 
@@ -80,6 +93,7 @@ async function readCloudData() {
   const snap = await getDoc(ref)
   if (!snap.exists()) return null
   const data = snap.data()
+
   return {
     members: data.members || initialMembers,
     payments: data.payments || initialPayments,
@@ -104,6 +118,7 @@ function StatCard({ title, value }) {
 
 export default function App() {
   const initial = readLocalData()
+
   const [booting, setBooting] = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [username, setUsername] = useState('')
@@ -117,11 +132,18 @@ export default function App() {
   const [editingId, setEditingId] = useState(null)
   const [saveState, setSaveState] = useState('')
   const [form, setForm] = useState({
-    name: '', phone: '', plan: 'Aylık', startDate: '', endDate: '', balance: 0, debt: 0,
+    name: '',
+    phone: '',
+    plan: 'Aylık',
+    startDate: '',
+    endDate: '',
+    balance: 0,
+    debt: 0,
   })
 
   useEffect(() => {
     let mounted = true
+
     ;(async () => {
       try {
         if (hasFirebaseConfig) {
@@ -136,13 +158,18 @@ export default function App() {
         if (mounted) setBooting(false)
       }
     })()
-    return () => { mounted = false }
+
+    return () => {
+      mounted = false
+    }
   }, [])
 
   useEffect(() => {
     if (booting) return
+
     const payload = { settings, members, payments }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+
     if (hasFirebaseConfig) {
       setSaveState('Kaydediliyor...')
       writeCloudData(payload)
@@ -154,24 +181,43 @@ export default function App() {
 
   const stats = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10)
+
     return {
       total: members.length,
       active: members.filter((m) => isActive(m.endDate)).length,
       expired: members.filter((m) => !isActive(m.endDate)).length,
-      todayIncome: payments.filter((p) => p.date === today).reduce((a, b) => a + Number(b.amount || 0), 0),
-      monthIncome: payments.filter((p) => p.date.startsWith(today.slice(0, 7))).reduce((a, b) => a + Number(b.amount || 0), 0),
+      todayIncome: payments
+        .filter((p) => p.date === today)
+        .reduce((a, b) => a + Number(b.amount || 0), 0),
+      monthIncome: payments
+        .filter((p) => p.date.startsWith(today.slice(0, 7)))
+        .reduce((a, b) => a + Number(b.amount || 0), 0),
     }
   }, [members, payments])
 
   const filteredMembers = useMemo(() => {
     const q = search.toLowerCase().trim()
     if (!q) return members
-    return members.filter((m) => m.name.toLowerCase().includes(q) || m.phone.includes(q) || m.plan.toLowerCase().includes(q))
+
+    return members.filter(
+      (m) =>
+        m.name.toLowerCase().includes(q) ||
+        m.phone.includes(q) ||
+        m.plan.toLowerCase().includes(q)
+    )
   }, [members, search])
 
   const openNewMember = () => {
     setEditingId(null)
-    setForm({ name: '', phone: '', plan: 'Aylık', startDate: '', endDate: '', balance: 0, debt: 0 })
+    setForm({
+      name: '',
+      phone: '',
+      plan: 'Aylık',
+      startDate: '',
+      endDate: '',
+      balance: 0,
+      debt: 0,
+    })
     setShowModal(true)
   }
 
@@ -186,12 +232,21 @@ export default function App() {
       alert('Ad soyad ve telefon zorunludur.')
       return
     }
-    const payload = { ...form, balance: Number(form.balance || 0), debt: Number(form.debt || 0) }
+
+    const payload = {
+      ...form,
+      balance: Number(form.balance || 0),
+      debt: Number(form.debt || 0),
+    }
+
     if (editingId) {
-      setMembers((prev) => prev.map((m) => (m.id === editingId ? { ...m, ...payload } : m)))
+      setMembers((prev) =>
+        prev.map((m) => (m.id === editingId ? { ...m, ...payload } : m))
+      )
     } else {
       setMembers((prev) => [{ id: Date.now(), ...payload }, ...prev])
     }
+
     setShowModal(false)
   }
 
@@ -203,16 +258,29 @@ export default function App() {
   const addPayment = (member) => {
     const amountText = window.prompt(`${member.name} için ödeme tutarı girin:`)
     if (!amountText) return
+
     const amount = Number(amountText)
     if (Number.isNaN(amount)) {
       alert('Geçerli bir tutar girin.')
       return
     }
-    setPayments((prev) => [{ id: Date.now(), memberName: member.name, amount, date: new Date().toISOString().slice(0, 10) }, ...prev])
+
+    setPayments((prev) => [
+      {
+        id: Date.now(),
+        memberName: member.name,
+        amount,
+        date: new Date().toISOString().slice(0, 10),
+      },
+      ...prev,
+    ])
   }
 
   const login = () => {
-    if (username === settings.systemUsername && password === settings.systemPassword) {
+    if (
+      username === settings.systemUsername &&
+      password === settings.systemPassword
+    ) {
       setIsLoggedIn(true)
     } else {
       alert('Kullanıcı adı veya şifre hatalı.')
@@ -229,11 +297,25 @@ export default function App() {
         <div className="card login-card">
           <div className="brand">MAXFİT GYM</div>
           <div className="subtitle">Web Yönetim Paneli</div>
+
           <label>Kullanıcı Adı</label>
-          <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="maxfit" />
+          <input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="maxfit"
+          />
+
           <label>Şifre</label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="1453" />
-          <button className="primary-btn" onClick={login}>Giriş Yap</button>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="1453"
+          />
+
+          <button className="primary-btn" onClick={login}>
+            Giriş Yap
+          </button>
         </div>
       </div>
     )
@@ -246,18 +328,43 @@ export default function App() {
           <div className="brand">{settings.salonName}</div>
           <div className="subtitle">Profesyonel web yönetim paneli</div>
         </div>
+
         <div className="topbar-right">
           {saveState ? <span className="badge">{saveState}</span> : null}
-          <span className="badge yellow">Kullanıcı: {settings.systemUsername}</span>
-          <button className="ghost-btn" onClick={() => setIsLoggedIn(false)}>Çıkış</button>
+          <span className="badge yellow">
+            Kullanıcı: {settings.systemUsername}
+          </span>
+          <button className="ghost-btn" onClick={() => setIsLoggedIn(false)}>
+            Çıkış
+          </button>
         </div>
       </header>
 
       <nav className="tabs">
-        <button className={tab === 'dashboard' ? 'tab active' : 'tab'} onClick={() => setTab('dashboard')}>Ana Sayfa</button>
-        <button className={tab === 'members' ? 'tab active' : 'tab'} onClick={() => setTab('members')}>Üyeler</button>
-        <button className={tab === 'payments' ? 'tab active' : 'tab'} onClick={() => setTab('payments')}>Ödemeler</button>
-        <button className={tab === 'settings' ? 'tab active' : 'tab'} onClick={() => setTab('settings')}>Ayarlar</button>
+        <button
+          className={tab === 'dashboard' ? 'tab active' : 'tab'}
+          onClick={() => setTab('dashboard')}
+        >
+          Ana Sayfa
+        </button>
+        <button
+          className={tab === 'members' ? 'tab active' : 'tab'}
+          onClick={() => setTab('members')}
+        >
+          Üyeler
+        </button>
+        <button
+          className={tab === 'payments' ? 'tab active' : 'tab'}
+          onClick={() => setTab('payments')}
+        >
+          Ödemeler
+        </button>
+        <button
+          className={tab === 'settings' ? 'tab active' : 'tab'}
+          onClick={() => setTab('settings')}
+        >
+          Ayarlar
+        </button>
       </nav>
 
       {tab === 'dashboard' && (
@@ -268,6 +375,7 @@ export default function App() {
             <StatCard title="Süresi Biten" value={stats.expired} />
             <StatCard title="Bugünkü Kazanç" value={`${stats.todayIncome} ₺`} />
           </div>
+
           <div className="two-col">
             <div className="card">
               <h3>Yakında Süresi Bitecek Üyeler</h3>
@@ -285,12 +393,24 @@ export default function App() {
                 ))}
               </div>
             </div>
+
             <div className="card">
               <h3>Hızlı İşlemler</h3>
               <div className="action-stack">
-                <button className="primary-btn" onClick={openNewMember}>Yeni Üye Ekle</button>
-                <button className="ghost-btn full" onClick={() => setTab('members')}>Üyeleri Aç</button>
-                <a className="success-link" href={`https://wa.me/${formatWhatsapp(settings.salonWhatsapp)}`} target="_blank" rel="noreferrer">Salon WhatsApp</a>
+                <button className="primary-btn" onClick={openNewMember}>
+                  Yeni Üye Ekle
+                </button>
+                <button className="ghost-btn full" onClick={() => setTab('members')}>
+                  Üyeleri Aç
+                </button>
+                <a
+                  className="success-link"
+                  href={`https://wa.me/${formatWhatsapp(settings.salonWhatsapp)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Salon WhatsApp
+                </a>
               </div>
             </div>
           </div>
@@ -304,9 +424,17 @@ export default function App() {
               <h3>Üye Yönetimi</h3>
               <div className="muted">Toplam {filteredMembers.length} üye listeleniyor.</div>
             </div>
+
             <div className="header-actions">
-              <input className="search-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="İsim veya telefon ara" />
-              <button className="primary-btn" onClick={openNewMember}>Üye Ekle</button>
+              <input
+                className="search-input"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="İsim veya telefon ara"
+              />
+              <button className="primary-btn" onClick={openNewMember}>
+                Üye Ekle
+              </button>
             </div>
           </div>
 
@@ -328,14 +456,31 @@ export default function App() {
                     <td>{m.name}</td>
                     <td>{m.phone}</td>
                     <td>{m.plan}</td>
-                    <td><span className={isActive(m.endDate) ? 'status active' : 'status expired'}>{m.endDate}</span></td>
+                    <td>
+                      <span className={isActive(m.endDate) ? 'status active' : 'status expired'}>
+                        {m.endDate}
+                      </span>
+                    </td>
                     <td>{m.balance} ₺</td>
                     <td>
                       <div className="row-actions">
-                        <button className="mini-btn blue" onClick={() => openEditMember(m)}>Düzenle</button>
-                        <a className="mini-link green" href={`https://wa.me/${formatWhatsapp(m.phone)}`} target="_blank" rel="noreferrer">WhatsApp</a>
-                        <button className="mini-btn yellow" onClick={() => addPayment(m)}>Ödeme</button>
-                        <button className="mini-btn red" onClick={() => deleteMember(m.id)}>Sil</button>
+                        <button className="mini-btn blue" onClick={() => openEditMember(m)}>
+                          Düzenle
+                        </button>
+                        <a
+                          className="mini-link green"
+                          href={`https://wa.me/${formatWhatsapp(m.phone)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          WhatsApp
+                        </a>
+                        <button className="mini-btn yellow" onClick={() => addPayment(m)}>
+                          Ödeme
+                        </button>
+                        <button className="mini-btn red" onClick={() => deleteMember(m.id)}>
+                          Sil
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -352,6 +497,7 @@ export default function App() {
             <StatCard title="Aylık Kazanç" value={`${stats.monthIncome} ₺`} />
             <StatCard title="Toplam Ödeme Kaydı" value={payments.length} />
           </div>
+
           <div className="card">
             <h3>Ödeme Geçmişi</h3>
             <div className="table-wrap">
@@ -382,25 +528,53 @@ export default function App() {
         <section className="settings-grid">
           <div className="card">
             <h3>Salon Ayarları</h3>
+
             <label>Salon Adı</label>
-            <input value={settings.salonName} onChange={(e) => setSettings((s) => ({ ...s, salonName: e.target.value }))} />
+            <input
+              value={settings.salonName}
+              onChange={(e) => setSettings((s) => ({ ...s, salonName: e.target.value }))}
+            />
+
             <label>WhatsApp Numarası</label>
-            <input value={settings.salonWhatsapp} onChange={(e) => setSettings((s) => ({ ...s, salonWhatsapp: e.target.value }))} />
-            <div className="muted small">0507... yazabilirsiniz. Sistem otomatik 90 formatına çevirir.</div>
+            <input
+              value={settings.salonWhatsapp}
+              onChange={(e) => setSettings((s) => ({ ...s, salonWhatsapp: e.target.value }))}
+            />
+            <div className="muted small">
+              0507... yazabilirsiniz. Sistem otomatik 90 formatına çevirir.
+            </div>
+
             <label>Kullanıcı Adı</label>
-            <input value={settings.systemUsername} onChange={(e) => setSettings((s) => ({ ...s, systemUsername: e.target.value }))} />
+            <input
+              value={settings.systemUsername}
+              onChange={(e) => setSettings((s) => ({ ...s, systemUsername: e.target.value }))}
+            />
+
             <label>Şifre</label>
-            <input value={settings.systemPassword} onChange={(e) => setSettings((s) => ({ ...s, systemPassword: e.target.value }))} />
+            <input
+              value={settings.systemPassword}
+              onChange={(e) => setSettings((s) => ({ ...s, systemPassword: e.target.value }))}
+            />
+
             <div className="row-actions top-gap">
               <button className="primary-btn">Ayarları Kaydet</button>
-              <a className="ghost-link" href={`https://wa.me/${formatWhatsapp(settings.salonWhatsapp)}`} target="_blank" rel="noreferrer">Salon WhatsApp Aç</a>
+              <a
+                className="ghost-link"
+                href={`https://wa.me/${formatWhatsapp(settings.salonWhatsapp)}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Salon WhatsApp Aç
+              </a>
             </div>
           </div>
 
           <div className="card">
             <h3>Bulut Bağlantı Durumu</h3>
             <p>Durum: {hasFirebaseConfig ? 'Firebase bağlı' : 'Şu anda yerel kayıt modu'}</p>
-            <p className="muted">Firebase anahtarlarını girince üyeler, ödemeler ve ayarlar buluta kaydolur.</p>
+            <p className="muted">
+              Firebase anahtarlarını girince üyeler, ödemeler ve ayarlar buluta kaydolur.
+            </p>
           </div>
         </section>
       )}
@@ -409,39 +583,76 @@ export default function App() {
         <div className="modal-backdrop" onClick={() => setShowModal(false)}>
           <div className="modal card" onClick={(e) => e.stopPropagation()}>
             <h3>{editingId ? 'Üye Düzenle' : 'Yeni Üye Ekle'}</h3>
+
             <div className="form-grid">
               <div>
                 <label>Ad Soyad</label>
-                <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                <input
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                />
               </div>
+
               <div>
                 <label>Telefon</label>
-                <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                <input
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                />
               </div>
+
               <div>
                 <label>Paket</label>
-                <input value={form.plan} onChange={(e) => setForm({ ...form, plan: e.target.value })} />
+                <input
+                  value={form.plan}
+                  onChange={(e) => setForm({ ...form, plan: e.target.value })}
+                />
               </div>
+
               <div>
                 <label>Bakiye</label>
-                <input type="number" value={form.balance} onChange={(e) => setForm({ ...form, balance: e.target.value })} />
+                <input
+                  type="number"
+                  value={form.balance}
+                  onChange={(e) => setForm({ ...form, balance: e.target.value })}
+                />
               </div>
+
               <div>
                 <label>Başlangıç</label>
-                <input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
+                <input
+                  type="date"
+                  value={form.startDate}
+                  onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                />
               </div>
+
               <div>
                 <label>Bitiş</label>
-                <input type="date" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} />
+                <input
+                  type="date"
+                  value={form.endDate}
+                  onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+                />
               </div>
+
               <div className="full-width">
                 <label>Borç</label>
-                <input type="number" value={form.debt} onChange={(e) => setForm({ ...form, debt: e.target.value })} />
+                <input
+                  type="number"
+                  value={form.debt}
+                  onChange={(e) => setForm({ ...form, debt: e.target.value })}
+                />
               </div>
             </div>
+
             <div className="row-actions top-gap">
-              <button className="ghost-btn" onClick={() => setShowModal(false)}>İptal</button>
-              <button className="primary-btn" onClick={saveMember}>Kaydet</button>
+              <button className="ghost-btn" onClick={() => setShowModal(false)}>
+                İptal
+              </button>
+              <button className="primary-btn" onClick={saveMember}>
+                Kaydet
+              </button>
             </div>
           </div>
         </div>
