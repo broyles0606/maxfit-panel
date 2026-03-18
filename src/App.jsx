@@ -2,14 +2,27 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { initializeApp, getApps } from 'firebase/app'
 import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore'
 
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: '',
-  authDomain: '',
-  projectId: '',
-  storageBucket: '',
-  messagingSenderId: '',
-  appId: '',
-}
+  apiKey: "AIzaSyCwJBvcBEqDqNtCJ854LXKNKFnnVwbR4Ro",
+  authDomain: "maxfit-panel.firebaseapp.com",
+  projectId: "maxfit-panel",
+  storageBucket: "maxfit-panel.firebasestorage.app",
+  messagingSenderId: "794871946224",
+  appId: "1:794871946224:web:848f37aca0c325b87b9b35",
+  measurementId: "G-JTNCVFDZN7"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
 
 const hasFirebaseConfig = Boolean(
   firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId && firebaseConfig.appId
