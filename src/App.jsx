@@ -1,662 +1,745 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { initializeApp, getApps } from 'firebase/app'
-import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore'
+import React, { useEffect, useMemo, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Home, Users, Wallet, Settings, Phone, Search, Plus, Pencil, Trash2, Dumbbell, Loader2, UserRound, CalendarDays, BadgeDollarSign } from "lucide-react";
+
+// Firebase kurulumu için kendi bilgilerinizi buraya girin.
+// Bilgiler doluysa sistem Firestore kullanır.
+// Boşsa localStorage ile çalışmaya devam eder.
+import { initializeApp, getApps } from "firebase/app";
+import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCwJBvcBEqDqNtCJ854LXKNKFnnVwbR4Ro",
-  authDomain: "maxfit-panel.firebaseapp.com",
-  projectId: "maxfit-panel",
-  storageBucket: "maxfit-panel.firebasestorage.app",
-  messagingSenderId: "794871946224",
-  appId: "1:794871946224:web:848f37aca0c325b87b9b35",
-  measurementId: "G-JTNCVFDZN7"
-}
+  apiKey: "",
+  authDomain: "",
+  projectId: "",
+  storageBucket: "",
+  messagingSenderId: "",
+  appId: "",
+};
 
 const hasFirebaseConfig = Boolean(
-  firebaseConfig.apiKey &&
-    firebaseConfig.authDomain &&
-    firebaseConfig.projectId &&
-    firebaseConfig.appId
-)
+  firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId && firebaseConfig.appId
+);
 
-const app = hasFirebaseConfig
-  ? (getApps().length ? getApps()[0] : initializeApp(firebaseConfig))
-  : null
-
-const db = app ? getFirestore(app) : null
+const app = hasFirebaseConfig ? (getApps().length ? getApps()[0] : initializeApp(firebaseConfig)) : null;
+const db = app ? getFirestore(app) : null;
 
 const initialMembers = [
-  { id: 1, name: 'Ahmet Yılmaz', phone: '05071234567', plan: 'Aylık', startDate: '2026-03-01', endDate: '2026-04-01', balance: 0, debt: 0 },
-  { id: 2, name: 'Mehmet Kaya', phone: '05335557788', plan: '3 Aylık', startDate: '2026-01-15', endDate: '2026-04-15', balance: 300, debt: 0 },
-  { id: 3, name: 'Zeynep Demir', phone: '05448889900', plan: 'Aylık', startDate: '2026-02-01', endDate: '2026-03-01', balance: 0, debt: 250 },
-]
+  {
+    id: 1,
+    name: "Ahmet Yılmaz",
+    phone: "05071234567",
+    plan: "Aylık",
+    startDate: "2026-03-01",
+    endDate: "2026-04-01",
+    balance: 0,
+    debt: 0,
+    active: true,
+  },
+  {
+    id: 2,
+    name: "Mehmet Kaya",
+    phone: "05335557788",
+    plan: "3 Aylık",
+    startDate: "2026-01-15",
+    endDate: "2026-04-15",
+    balance: 300,
+    debt: 0,
+    active: true,
+  },
+  {
+    id: 3,
+    name: "Zeynep Demir",
+    phone: "05448889900",
+    plan: "Aylık",
+    startDate: "2026-02-01",
+    endDate: "2026-03-01",
+    balance: 0,
+    debt: 250,
+    active: false,
+  },
+];
 
 const initialPayments = [
-  { id: 1, memberName: 'Ahmet Yılmaz', amount: 1200, date: '2026-03-01' },
-  { id: 2, memberName: 'Mehmet Kaya', amount: 3000, date: '2026-01-15' },
-  { id: 3, memberName: 'Zeynep Demir', amount: 950, date: '2026-02-01' },
-]
+  { id: 1, memberName: "Ahmet Yılmaz", amount: 1200, date: "2026-03-01" },
+  { id: 2, memberName: "Mehmet Kaya", amount: 3000, date: "2026-01-15" },
+  { id: 3, memberName: "Zeynep Demir", amount: 950, date: "2026-02-01" },
+];
 
 const initialSettings = {
-  salonName: 'MAXFİT GYM',
-  systemUsername: 'maxfit',
-  systemPassword: '1453',
-  salonWhatsapp: '05071370669',
-}
+  salonName: "MAXFİT GYM",
+  systemUsername: "maxfit",
+  systemPassword: "1453",
+  salonWhatsapp: "05071370669",
+};
 
-const STORAGE_KEY = 'maxfit-web-panel-data-v1'
-const CLOUD_DOC_ID = 'main'
+const STORAGE_KEY = "maxfit-web-panel-data-v2";
+const CLOUD_DOC_ID = "main";
 
 function formatWhatsapp(phone) {
-  const clean = (phone || '').replace(/\D/g, '')
-  if (clean.startsWith('90')) return clean
-  if (clean.startsWith('0')) return `90${clean.slice(1)}`
-  return clean
+  const clean = (phone || "").replace(/\D/g, "");
+  if (clean.startsWith("90")) return clean;
+  if (clean.startsWith("0")) return `90${clean.slice(1)}`;
+  return clean;
 }
 
-function isActive(endDate) {
-  const end = new Date(endDate)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  return end >= today
+function statusFromEndDate(endDate) {
+  const end = new Date(endDate);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return end >= today;
 }
 
 function readLocalData() {
-  const raw = localStorage.getItem(STORAGE_KEY)
+  if (typeof window === "undefined") {
+    return { members: initialMembers, payments: initialPayments, settings: initialSettings };
+  }
+
+  const raw = window.localStorage.getItem(STORAGE_KEY);
   if (!raw) {
-    return {
-      members: initialMembers,
-      payments: initialPayments,
-      settings: initialSettings,
-    }
+    return { members: initialMembers, payments: initialPayments, settings: initialSettings };
   }
 
   try {
-    const parsed = JSON.parse(raw)
+    const parsed = JSON.parse(raw);
     return {
       members: parsed.members || initialMembers,
       payments: parsed.payments || initialPayments,
       settings: { ...initialSettings, ...(parsed.settings || {}) },
-    }
+    };
   } catch {
-    return {
-      members: initialMembers,
-      payments: initialPayments,
-      settings: initialSettings,
-    }
+    return { members: initialMembers, payments: initialPayments, settings: initialSettings };
   }
 }
 
 async function readCloudData() {
-  if (!db) return null
-  const ref = doc(db, 'maxfitPanel', CLOUD_DOC_ID)
-  const snap = await getDoc(ref)
-  if (!snap.exists()) return null
-  const data = snap.data()
-
+  if (!db) return null;
+  const ref = doc(db, "maxfitPanel", CLOUD_DOC_ID);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return null;
+  const data = snap.data();
   return {
     members: data.members || initialMembers,
     payments: data.payments || initialPayments,
     settings: { ...initialSettings, ...(data.settings || {}) },
-  }
+  };
 }
 
 async function writeCloudData(payload) {
-  if (!db) return
-  const ref = doc(db, 'maxfitPanel', CLOUD_DOC_ID)
-  await setDoc(ref, payload, { merge: true })
+  if (!db) return;
+  const ref = doc(db, "maxfitPanel", CLOUD_DOC_ID);
+  await setDoc(ref, payload, { merge: true });
 }
 
-function StatCard({ title, value }) {
-  return (
-    <div className="card stat-card">
-      <div className="muted">{title}</div>
-      <div className="stat-value">{value}</div>
-    </div>
-  )
-}
+export default function MaxfitWebPanel() {
+  const initial = readLocalData();
 
-export default function App() {
-  const initial = readLocalData()
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [isBooting, setIsBooting] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
 
-  const [booting, setBooting] = useState(true)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [tab, setTab] = useState('dashboard')
-  const [search, setSearch] = useState('')
-  const [settings, setSettings] = useState(initial.settings)
-  const [members, setMembers] = useState(initial.members)
-  const [payments, setPayments] = useState(initial.payments)
-  const [showModal, setShowModal] = useState(false)
-  const [editingId, setEditingId] = useState(null)
-  const [saveState, setSaveState] = useState('')
-  const [form, setForm] = useState({
-    name: '',
-    phone: '',
-    plan: 'Aylık',
-    startDate: '',
-    endDate: '',
+  const [settings, setSettings] = useState(initial.settings);
+  const [members, setMembers] = useState(initial.members);
+  const [payments, setPayments] = useState(initial.payments);
+  const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState("dashboard");
+
+  const [openMemberDialog, setOpenMemberDialog] = useState(false);
+  const [editingMember, setEditingMember] = useState(null);
+  const [memberForm, setMemberForm] = useState({
+    name: "",
+    phone: "",
+    plan: "Aylık",
+    startDate: "",
+    endDate: "",
     balance: 0,
     debt: 0,
-  })
+  });
+  const [selectedMember, setSelectedMember] = useState(null);
 
   useEffect(() => {
-    let mounted = true
+    let mounted = true;
 
-    ;(async () => {
+    async function boot() {
       try {
         if (hasFirebaseConfig) {
-          const cloud = await readCloudData()
-          if (cloud && mounted) {
-            setSettings(cloud.settings)
-            setMembers(cloud.members)
-            setPayments(cloud.payments)
+          const cloudData = await readCloudData();
+          if (cloudData && mounted) {
+            setMembers(cloudData.members);
+            setPayments(cloudData.payments);
+            setSettings(cloudData.settings);
           }
         }
+      } catch (error) {
+        console.error("Bulut verisi okunamadı:", error);
       } finally {
-        if (mounted) setBooting(false)
+        if (mounted) setIsBooting(false);
       }
-    })()
-
-    return () => {
-      mounted = false
     }
-  }, [])
+
+    boot();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
-    if (booting) return
+    if (isBooting) return;
 
-    const payload = { settings, members, payments }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
-
-    if (hasFirebaseConfig) {
-      setSaveState('Kaydediliyor...')
-      writeCloudData(payload)
-        .then(() => setSaveState('Buluta kaydedildi'))
-        .catch(() => setSaveState('Yerel kayıt yapıldı'))
-        .finally(() => setTimeout(() => setSaveState(''), 1800))
+    const payload = { members, payments, settings };
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     }
-  }, [settings, members, payments, booting])
+
+    let active = true;
+    if (hasFirebaseConfig) {
+      setIsSaving(true);
+      writeCloudData(payload)
+        .then(() => {
+          if (!active) return;
+          setSaveMessage("Buluta kaydedildi");
+        })
+        .catch((error) => {
+          console.error("Bulut kayıt hatası:", error);
+          if (!active) return;
+          setSaveMessage("Yerel kayıt yapıldı");
+        })
+        .finally(() => {
+          if (!active) return;
+          setIsSaving(false);
+          setTimeout(() => setSaveMessage(""), 2000);
+        });
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [members, payments, settings, isBooting]);
 
   const stats = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10)
-
-    return {
-      total: members.length,
-      active: members.filter((m) => isActive(m.endDate)).length,
-      expired: members.filter((m) => !isActive(m.endDate)).length,
-      todayIncome: payments
-        .filter((p) => p.date === today)
-        .reduce((a, b) => a + Number(b.amount || 0), 0),
-      monthIncome: payments
-        .filter((p) => p.date.startsWith(today.slice(0, 7)))
-        .reduce((a, b) => a + Number(b.amount || 0), 0),
-    }
-  }, [members, payments])
+    const total = members.length;
+    const active = members.filter((m) => statusFromEndDate(m.endDate)).length;
+    const expired = members.filter((m) => !statusFromEndDate(m.endDate)).length;
+    const today = new Date().toISOString().slice(0, 10);
+    const todayIncome = payments
+      .filter((p) => p.date === today)
+      .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+    return { total, active, expired, todayIncome };
+  }, [members, payments]);
 
   const filteredMembers = useMemo(() => {
-    const q = search.toLowerCase().trim()
-    if (!q) return members
-
+    const q = search.toLowerCase().trim();
+    if (!q) return members;
     return members.filter(
       (m) =>
         m.name.toLowerCase().includes(q) ||
         m.phone.includes(q) ||
         m.plan.toLowerCase().includes(q)
-    )
-  }, [members, search])
+    );
+  }, [members, search]);
 
-  const openNewMember = () => {
-    setEditingId(null)
-    setForm({
-      name: '',
-      phone: '',
-      plan: 'Aylık',
-      startDate: '',
-      endDate: '',
+  const monthlyIncome = useMemo(() => {
+    const month = new Date().toISOString().slice(0, 7);
+    return payments
+      .filter((p) => p.date.startsWith(month))
+      .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+  }, [payments]);
+
+  const handleLogin = () => {
+    if (username === settings.systemUsername && password === settings.systemPassword) {
+      setIsLoggedIn(true);
+    } else {
+      alert("Kullanıcı adı veya şifre hatalı.");
+    }
+  };
+
+  const resetForm = () => {
+    setMemberForm({
+      name: "",
+      phone: "",
+      plan: "Aylık",
+      startDate: "",
+      endDate: "",
       balance: 0,
       debt: 0,
-    })
-    setShowModal(true)
-  }
+    });
+    setEditingMember(null);
+  };
+
+  const openNewMember = () => {
+    resetForm();
+    setOpenMemberDialog(true);
+  };
 
   const openEditMember = (member) => {
-    setEditingId(member.id)
-    setForm({ ...member })
-    setShowModal(true)
-  }
+    setEditingMember(member);
+    setMemberForm({
+      name: member.name,
+      phone: member.phone,
+      plan: member.plan,
+      startDate: member.startDate,
+      endDate: member.endDate,
+      balance: member.balance,
+      debt: member.debt,
+    });
+    setOpenMemberDialog(true);
+  };
 
   const saveMember = () => {
-    if (!form.name || !form.phone) {
-      alert('Ad soyad ve telefon zorunludur.')
-      return
+    if (!memberForm.name || !memberForm.phone) {
+      alert("Ad soyad ve telefon zorunludur.");
+      return;
     }
 
     const payload = {
-      ...form,
-      balance: Number(form.balance || 0),
-      debt: Number(form.debt || 0),
-    }
+      ...memberForm,
+      balance: Number(memberForm.balance || 0),
+      debt: Number(memberForm.debt || 0),
+      active: statusFromEndDate(memberForm.endDate),
+    };
 
-    if (editingId) {
+    if (editingMember) {
       setMembers((prev) =>
-        prev.map((m) => (m.id === editingId ? { ...m, ...payload } : m))
-      )
+        prev.map((m) => (m.id === editingMember.id ? { ...m, ...payload } : m))
+      );
     } else {
-      setMembers((prev) => [{ id: Date.now(), ...payload }, ...prev])
+      setMembers((prev) => [...prev, { id: Date.now(), ...payload }]);
     }
 
-    setShowModal(false)
-  }
+    setOpenMemberDialog(false);
+    resetForm();
+  };
 
   const deleteMember = (id) => {
-    if (!window.confirm('Üyeyi silmek istiyor musunuz?')) return
-    setMembers((prev) => prev.filter((m) => m.id !== id))
-  }
+    if (!confirm("Üyeyi silmek istiyor musunuz?")) return;
+    setMembers((prev) => prev.filter((m) => m.id !== id));
+  };
 
-  const addPayment = (member) => {
-    const amountText = window.prompt(`${member.name} için ödeme tutarı girin:`)
-    if (!amountText) return
-
-    const amount = Number(amountText)
+  const addPaymentForMember = (member) => {
+    const amountText = prompt(`${member.name} için ödeme tutarı girin:`);
+    if (!amountText) return;
+    const amount = Number(amountText);
     if (Number.isNaN(amount)) {
-      alert('Geçerli bir tutar girin.')
-      return
+      alert("Geçerli bir tutar girin.");
+      return;
     }
-
     setPayments((prev) => [
-      {
-        id: Date.now(),
-        memberName: member.name,
-        amount,
-        date: new Date().toISOString().slice(0, 10),
-      },
+      { id: Date.now(), memberName: member.name, amount, date: new Date().toISOString().slice(0, 10) },
       ...prev,
-    ])
-  }
+    ]);
+  };
 
-  const login = () => {
-    if (
-      username === settings.systemUsername &&
-      password === settings.systemPassword
-    ) {
-      setIsLoggedIn(true)
-    } else {
-      alert('Kullanıcı adı veya şifre hatalı.')
-    }
-  }
+  const memberPaymentHistory = (memberName) => payments.filter((payment) => payment.memberName === memberName);
 
-  if (booting) {
-    return <div className="center-screen">Panel yükleniyor...</div>
+  if (isBooting) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
+        <div className="flex items-center gap-3 text-lg">
+          <Loader2 className="h-6 w-6 animate-spin text-yellow-400" />
+          Panel yükleniyor...
+        </div>
+      </div>
+    );
   }
 
   if (!isLoggedIn) {
     return (
-      <div className="center-screen page-bg">
-        <div className="card login-card">
-          <div className="brand">MAXFİT GYM</div>
-          <div className="subtitle">Web Yönetim Paneli</div>
-
-          <label>Kullanıcı Adı</label>
-          <input
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="maxfit"
-          />
-
-          <label>Şifre</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="1453"
-          />
-
-          <button className="primary-btn" onClick={login}>
-            Giriş Yap
-          </button>
-        </div>
+      <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center p-4">
+        <Card className="w-full max-w-md rounded-3xl border-zinc-800 bg-zinc-900 shadow-2xl">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-2xl bg-yellow-400 text-black flex items-center justify-center">
+                <Dumbbell className="h-6 w-6" />
+              </div>
+              <div>
+                <CardTitle className="text-2xl text-white">{settings.salonName}</CardTitle>
+                <p className="text-sm text-zinc-400">Web Yönetim Paneli</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-zinc-200">Kullanıcı Adı</Label>
+              <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="maxfit" className="bg-zinc-950 border-zinc-700 text-white" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-zinc-200">Şifre</Label>
+              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••" className="bg-zinc-950 border-zinc-700 text-white" />
+            </div>
+            <Button onClick={handleLogin} className="w-full rounded-2xl bg-yellow-400 text-black hover:bg-yellow-300">
+              Giriş Yap
+            </Button>
+          </CardContent>
+        </Card>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="page-bg app-shell">
-      <header className="topbar">
-        <div>
-          <div className="brand">{settings.salonName}</div>
-          <div className="subtitle">Profesyonel web yönetim paneli</div>
+    <div className="min-h-screen bg-zinc-950 text-white">
+      <div className="mx-auto max-w-7xl p-4 md:p-6">
+        <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">{settings.salonName}</h1>
+            <p className="text-zinc-400">Profesyonel web yönetim paneli</p>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            {saveMessage ? <Badge className="bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/20">{saveMessage}</Badge> : null}
+            {isSaving ? <Badge className="bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/20">Kaydediliyor...</Badge> : null}
+            <Badge className="bg-yellow-400 text-black hover:bg-yellow-400">Kullanıcı: {settings.systemUsername}</Badge>
+            <Button variant="outline" className="rounded-2xl border-zinc-700 text-white" onClick={() => setIsLoggedIn(false)}>
+              Çıkış
+            </Button>
+          </div>
         </div>
 
-        <div className="topbar-right">
-          {saveState ? <span className="badge">{saveState}</span> : null}
-          <span className="badge yellow">
-            Kullanıcı: {settings.systemUsername}
-          </span>
-          <button className="ghost-btn" onClick={() => setIsLoggedIn(false)}>
-            Çıkış
-          </button>
-        </div>
-      </header>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4 rounded-2xl bg-zinc-900 p-1">
+            <TabsTrigger value="dashboard" className="rounded-xl data-[state=active]:bg-yellow-400 data-[state=active]:text-black"><Home className="mr-2 h-4 w-4" />Ana Sayfa</TabsTrigger>
+            <TabsTrigger value="members" className="rounded-xl data-[state=active]:bg-yellow-400 data-[state=active]:text-black"><Users className="mr-2 h-4 w-4" />Üyeler</TabsTrigger>
+            <TabsTrigger value="payments" className="rounded-xl data-[state=active]:bg-yellow-400 data-[state=active]:text-black"><Wallet className="mr-2 h-4 w-4" />Ödemeler</TabsTrigger>
+            <TabsTrigger value="settings" className="rounded-xl data-[state=active]:bg-yellow-400 data-[state=active]:text-black"><Settings className="mr-2 h-4 w-4" />Ayarlar</TabsTrigger>
+          </TabsList>
 
-      <nav className="tabs">
-        <button
-          className={tab === 'dashboard' ? 'tab active' : 'tab'}
-          onClick={() => setTab('dashboard')}
-        >
-          Ana Sayfa
-        </button>
-        <button
-          className={tab === 'members' ? 'tab active' : 'tab'}
-          onClick={() => setTab('members')}
-        >
-          Üyeler
-        </button>
-        <button
-          className={tab === 'payments' ? 'tab active' : 'tab'}
-          onClick={() => setTab('payments')}
-        >
-          Ödemeler
-        </button>
-        <button
-          className={tab === 'settings' ? 'tab active' : 'tab'}
-          onClick={() => setTab('settings')}
-        >
-          Ayarlar
-        </button>
-      </nav>
-
-      {tab === 'dashboard' && (
-        <section>
-          <div className="stats-grid">
-            <StatCard title="Toplam Üye" value={stats.total} />
-            <StatCard title="Aktif Üye" value={stats.active} />
-            <StatCard title="Süresi Biten" value={stats.expired} />
-            <StatCard title="Bugünkü Kazanç" value={`${stats.todayIncome} ₺`} />
-          </div>
-
-          <div className="two-col">
-            <div className="card">
-              <h3>Yakında Süresi Bitecek Üyeler</h3>
-              <div className="list-stack">
-                {members.slice(0, 5).map((m) => (
-                  <div className="list-item" key={m.id}>
-                    <div>
-                      <strong>{m.name}</strong>
-                      <div className="muted">Bitiş: {m.endDate}</div>
-                    </div>
-                    <span className={isActive(m.endDate) ? 'status active' : 'status expired'}>
-                      {isActive(m.endDate) ? 'Aktif' : 'Süresi Bitti'}
-                    </span>
-                  </div>
-                ))}
-              </div>
+          <TabsContent value="dashboard" className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <StatCard title="Toplam Üye" value={stats.total} />
+              <StatCard title="Aktif Üye" value={stats.active} />
+              <StatCard title="Süresi Biten" value={stats.expired} />
+              <StatCard title="Bugünkü Kazanç" value={`${stats.todayIncome} ₺`} />
             </div>
 
-            <div className="card">
-              <h3>Hızlı İşlemler</h3>
-              <div className="action-stack">
-                <button className="primary-btn" onClick={openNewMember}>
-                  Yeni Üye Ekle
-                </button>
-                <button className="ghost-btn full" onClick={() => setTab('members')}>
-                  Üyeleri Aç
-                </button>
-                <a
-                  className="success-link"
-                  href={`https://wa.me/${formatWhatsapp(settings.salonWhatsapp)}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Salon WhatsApp
-                </a>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {tab === 'members' && (
-        <section className="card">
-          <div className="section-header">
-            <div>
-              <h3>Üye Yönetimi</h3>
-              <div className="muted">Toplam {filteredMembers.length} üye listeleniyor.</div>
-            </div>
-
-            <div className="header-actions">
-              <input
-                className="search-input"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="İsim veya telefon ara"
-              />
-              <button className="primary-btn" onClick={openNewMember}>
-                Üye Ekle
-              </button>
-            </div>
-          </div>
-
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Ad Soyad</th>
-                  <th>Telefon</th>
-                  <th>Paket</th>
-                  <th>Bitiş</th>
-                  <th>Bakiye</th>
-                  <th>İşlem</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredMembers.map((m) => (
-                  <tr key={m.id}>
-                    <td>{m.name}</td>
-                    <td>{m.phone}</td>
-                    <td>{m.plan}</td>
-                    <td>
-                      <span className={isActive(m.endDate) ? 'status active' : 'status expired'}>
-                        {m.endDate}
-                      </span>
-                    </td>
-                    <td>{m.balance} ₺</td>
-                    <td>
-                      <div className="row-actions">
-                        <button className="mini-btn blue" onClick={() => openEditMember(m)}>
-                          Düzenle
-                        </button>
-                        <a
-                          className="mini-link green"
-                          href={`https://wa.me/${formatWhatsapp(m.phone)}`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          WhatsApp
-                        </a>
-                        <button className="mini-btn yellow" onClick={() => addPayment(m)}>
-                          Ödeme
-                        </button>
-                        <button className="mini-btn red" onClick={() => deleteMember(m.id)}>
-                          Sil
-                        </button>
+            <div className="grid gap-6 xl:grid-cols-3">
+              <Card className="rounded-3xl border-zinc-800 bg-zinc-900 xl:col-span-2">
+                <CardHeader>
+                  <CardTitle className="text-white">Yakında Süresi Bitecek Üyeler</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {members.slice(0, 5).map((member) => (
+                    <div key={member.id} className="flex items-center justify-between rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+                      <div>
+                        <p className="font-semibold">{member.name}</p>
+                        <p className="text-sm text-zinc-400">Bitiş: {member.endDate}</p>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {tab === 'payments' && (
-        <section>
-          <div className="stats-grid two-stats">
-            <StatCard title="Aylık Kazanç" value={`${stats.monthIncome} ₺`} />
-            <StatCard title="Toplam Ödeme Kaydı" value={payments.length} />
-          </div>
-
-          <div className="card">
-            <h3>Ödeme Geçmişi</h3>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Üye</th>
-                    <th>Tutar</th>
-                    <th>Tarih</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {payments.map((p) => (
-                    <tr key={p.id}>
-                      <td>{p.memberName}</td>
-                      <td>{p.amount} ₺</td>
-                      <td>{p.date}</td>
-                    </tr>
+                      <Badge className={statusFromEndDate(member.endDate) ? "bg-emerald-500/20 text-emerald-300" : "bg-red-500/20 text-red-300"}>
+                        {statusFromEndDate(member.endDate) ? "Aktif" : "Süresi Bitti"}
+                      </Badge>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-3xl border-zinc-800 bg-zinc-900">
+                <CardHeader>
+                  <CardTitle className="text-white">Hızlı İşlemler</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button onClick={openNewMember} className="w-full rounded-2xl bg-yellow-400 text-black hover:bg-yellow-300">
+                    <Plus className="mr-2 h-4 w-4" /> Yeni Üye Ekle
+                  </Button>
+                  <Button onClick={() => setActiveTab("members")} variant="outline" className="w-full rounded-2xl border-zinc-700 text-white">
+                    <Users className="mr-2 h-4 w-4" /> Üyeleri Aç
+                  </Button>
+                  <a href={`https://wa.me/${formatWhatsapp(settings.salonWhatsapp)}`} target="_blank" rel="noreferrer" className="block">
+                    <Button className="w-full rounded-2xl bg-emerald-500 text-white hover:bg-emerald-400">
+                      <Phone className="mr-2 h-4 w-4" /> Salon WhatsApp
+                    </Button>
+                  </a>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="members" className="space-y-6">
+            <Card className="rounded-3xl border-zinc-800 bg-zinc-900">
+              <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <CardTitle className="text-white">Üye Yönetimi</CardTitle>
+                <div className="flex flex-col gap-3 md:flex-row">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                    <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="İsim veya telefon ara" className="w-full rounded-2xl border-zinc-700 bg-zinc-950 pl-9 text-white md:w-72" />
+                  </div>
+                  <Button onClick={openNewMember} className="rounded-2xl bg-yellow-400 text-black hover:bg-yellow-300">
+                    <Plus className="mr-2 h-4 w-4" /> Üye Ekle
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-4 text-sm text-zinc-400">Toplam {filteredMembers.length} üye listeleniyor.</div>
+                <div className="overflow-x-auto rounded-2xl border border-zinc-800">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-zinc-800 hover:bg-zinc-900">
+                        <TableHead className="text-zinc-300">Ad Soyad</TableHead>
+                        <TableHead className="text-zinc-300">Telefon</TableHead>
+                        <TableHead className="text-zinc-300">Paket</TableHead>
+                        <TableHead className="text-zinc-300">Bitiş</TableHead>
+                        <TableHead className="text-zinc-300">Bakiye</TableHead>
+                        <TableHead className="text-zinc-300">İşlem</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredMembers.map((member) => (
+                        <TableRow key={member.id} className="border-zinc-800 hover:bg-zinc-950/70">
+                          <TableCell className="font-medium text-white">
+                            <button onClick={() => setSelectedMember(member)} className="text-left hover:text-yellow-200">
+                              {member.name}
+                            </button>
+                          </TableCell>
+                          <TableCell className="text-zinc-300">{member.phone}</TableCell>
+                          <TableCell className="text-zinc-300">{member.plan}</TableCell>
+                          <TableCell>
+                            <Badge className={statusFromEndDate(member.endDate) ? "bg-emerald-500/20 text-emerald-300" : "bg-red-500/20 text-red-300"}>
+                              {member.endDate}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-zinc-300">{member.balance} ₺</TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-2">
+                              <Button size="sm" onClick={() => openEditMember(member)} className="rounded-xl bg-blue-600 text-white hover:bg-blue-500">
+                                <Pencil className="mr-1 h-4 w-4" /> Düzenle
+                              </Button>
+                              <a href={`https://wa.me/${formatWhatsapp(member.phone)}`} target="_blank" rel="noreferrer">
+                                <Button size="sm" className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-500">
+                                  <Phone className="mr-1 h-4 w-4" /> WhatsApp
+                                </Button>
+                              </a>
+                              <Button size="sm" onClick={() => addPaymentForMember(member)} className="rounded-xl bg-yellow-500 text-black hover:bg-yellow-400">
+                                <Wallet className="mr-1 h-4 w-4" /> Ödeme
+                              </Button>
+                              <Button size="sm" variant="destructive" onClick={() => deleteMember(member.id)} className="rounded-xl">
+                                <Trash2 className="mr-1 h-4 w-4" /> Sil
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="payments" className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              <StatCard title="Aylık Kazanç" value={`${monthlyIncome} ₺`} />
+              <StatCard title="Toplam Ödeme Kaydı" value={payments.length} />
+            </div>
+            <Card className="rounded-3xl border-zinc-800 bg-zinc-900">
+              <CardHeader>
+                <CardTitle className="text-white">Ödeme Geçmişi</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto rounded-2xl border border-zinc-800">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-zinc-800 hover:bg-zinc-900">
+                        <TableHead className="text-zinc-300">Üye</TableHead>
+                        <TableHead className="text-zinc-300">Tutar</TableHead>
+                        <TableHead className="text-zinc-300">Tarih</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {payments.map((payment) => (
+                        <TableRow key={payment.id} className="border-zinc-800 hover:bg-zinc-950/70">
+                          <TableCell className="text-white">{payment.memberName}</TableCell>
+                          <TableCell className="text-zinc-300">{payment.amount} ₺</TableCell>
+                          <TableCell className="text-zinc-300">{payment.date}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="settings" className="space-y-6">
+            <Card className="rounded-3xl border-zinc-800 bg-zinc-900">
+              <CardHeader>
+                <CardTitle className="text-white">Salon Ayarları</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label className="text-zinc-200">Salon Adı</Label>
+                  <Input value={settings.salonName} onChange={(e) => setSettings((prev) => ({ ...prev, salonName: e.target.value }))} className="rounded-2xl border-zinc-700 bg-zinc-950 text-white" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-zinc-200">WhatsApp Numarası</Label>
+                  <Input value={settings.salonWhatsapp} onChange={(e) => setSettings((prev) => ({ ...prev, salonWhatsapp: e.target.value }))} className="rounded-2xl border-zinc-700 bg-zinc-950 text-white" />
+                  <p className="text-xs text-zinc-500">0507... yazabilirsiniz. Sistem otomatik 90 formatına çevirir.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-zinc-200">Kullanıcı Adı</Label>
+                  <Input value={settings.systemUsername} onChange={(e) => setSettings((prev) => ({ ...prev, systemUsername: e.target.value }))} className="rounded-2xl border-zinc-700 bg-zinc-950 text-white" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-zinc-200">Şifre</Label>
+                  <Input value={settings.systemPassword} onChange={(e) => setSettings((prev) => ({ ...prev, systemPassword: e.target.value }))} className="rounded-2xl border-zinc-700 bg-zinc-950 text-white" />
+                </div>
+                <div className="md:col-span-2 flex gap-3 pt-2 flex-wrap">
+                  <Button className="rounded-2xl bg-yellow-400 text-black hover:bg-yellow-300">Ayarları Kaydet</Button>
+                  <a href={`https://wa.me/${formatWhatsapp(settings.salonWhatsapp)}`} target="_blank" rel="noreferrer">
+                    <Button variant="outline" className="rounded-2xl border-zinc-700 text-white">Salon WhatsApp Aç</Button>
+                  </a>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-3xl border-zinc-800 bg-zinc-900">
+              <CardHeader>
+                <CardTitle className="text-white">Bulut Bağlantı Durumu</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-zinc-300">
+                <p>Durum: {hasFirebaseConfig ? "Firebase bağlı" : "Şu anda yerel kayıt modu"}</p>
+                <p>Firebase anahtarlarını girince üyeler, ödemeler ve ayarlar buluta kaydolur.</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      <Dialog open={openMemberDialog} onOpenChange={setOpenMemberDialog}>
+        <DialogContent className="border-zinc-800 bg-zinc-900 text-white sm:max-w-xl rounded-3xl">
+          <DialogHeader>
+            <DialogTitle>{editingMember ? "Üye Düzenle" : "Yeni Üye Ekle"}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Ad Soyad</Label>
+              <Input value={memberForm.name} onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })} className="border-zinc-700 bg-zinc-950 text-white" />
+            </div>
+            <div className="space-y-2">
+              <Label>Telefon</Label>
+              <Input value={memberForm.phone} onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })} className="border-zinc-700 bg-zinc-950 text-white" />
+            </div>
+            <div className="space-y-2">
+              <Label>Paket</Label>
+              <Input value={memberForm.plan} onChange={(e) => setMemberForm({ ...memberForm, plan: e.target.value })} className="border-zinc-700 bg-zinc-950 text-white" />
+            </div>
+            <div className="space-y-2">
+              <Label>Bakiye</Label>
+              <Input type="number" value={memberForm.balance} onChange={(e) => setMemberForm({ ...memberForm, balance: e.target.value })} className="border-zinc-700 bg-zinc-950 text-white" />
+            </div>
+            <div className="space-y-2">
+              <Label>Başlangıç</Label>
+              <Input type="date" value={memberForm.startDate} onChange={(e) => setMemberForm({ ...memberForm, startDate: e.target.value })} className="border-zinc-700 bg-zinc-950 text-white" />
+            </div>
+            <div className="space-y-2">
+              <Label>Bitiş</Label>
+              <Input type="date" value={memberForm.endDate} onChange={(e) => setMemberForm({ ...memberForm, endDate: e.target.value })} className="border-zinc-700 bg-zinc-950 text-white" />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label>Borç</Label>
+              <Input type="number" value={memberForm.debt} onChange={(e) => setMemberForm({ ...memberForm, debt: e.target.value })} className="border-zinc-700 bg-zinc-950 text-white" />
             </div>
           </div>
-        </section>
-      )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpenMemberDialog(false)} className="border-zinc-700 text-white">İptal</Button>
+            <Button onClick={saveMember} className="bg-yellow-400 text-black hover:bg-yellow-300">Kaydet</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {tab === 'settings' && (
-        <section className="settings-grid">
-          <div className="card">
-            <h3>Salon Ayarları</h3>
-
-            <label>Salon Adı</label>
-            <input
-              value={settings.salonName}
-              onChange={(e) => setSettings((s) => ({ ...s, salonName: e.target.value }))}
-            />
-
-            <label>WhatsApp Numarası</label>
-            <input
-              value={settings.salonWhatsapp}
-              onChange={(e) => setSettings((s) => ({ ...s, salonWhatsapp: e.target.value }))}
-            />
-            <div className="muted small">
-              0507... yazabilirsiniz. Sistem otomatik 90 formatına çevirir.
-            </div>
-
-            <label>Kullanıcı Adı</label>
-            <input
-              value={settings.systemUsername}
-              onChange={(e) => setSettings((s) => ({ ...s, systemUsername: e.target.value }))}
-            />
-
-            <label>Şifre</label>
-            <input
-              value={settings.systemPassword}
-              onChange={(e) => setSettings((s) => ({ ...s, systemPassword: e.target.value }))}
-            />
-
-            <div className="row-actions top-gap">
-              <button className="primary-btn">Ayarları Kaydet</button>
-              <a
-                className="ghost-link"
-                href={`https://wa.me/${formatWhatsapp(settings.salonWhatsapp)}`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Salon WhatsApp Aç
-              </a>
-            </div>
-          </div>
-
-          <div className="card">
-            <h3>Bulut Bağlantı Durumu</h3>
-            <p>Durum: {hasFirebaseConfig ? 'Firebase bağlı' : 'Şu anda yerel kayıt modu'}</p>
-            <p className="muted">
-              Firebase anahtarlarını girince üyeler, ödemeler ve ayarlar buluta kaydolur.
-            </p>
-          </div>
-        </section>
-      )}
-
-      {showModal && (
-        <div className="modal-backdrop" onClick={() => setShowModal(false)}>
-          <div className="modal card" onClick={(e) => e.stopPropagation()}>
-            <h3>{editingId ? 'Üye Düzenle' : 'Yeni Üye Ekle'}</h3>
-
-            <div className="form-grid">
-              <div>
-                <label>Ad Soyad</label>
-                <input
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                />
+      <Dialog open={!!selectedMember} onOpenChange={(open) => !open && setSelectedMember(null)}>
+        <DialogContent className="border-zinc-800 bg-zinc-900 text-white sm:max-w-3xl rounded-3xl">
+          {selectedMember ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-2xl">
+                  <UserRound className="h-6 w-6 text-yellow-400" /> {selectedMember.name}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 md:grid-cols-3">
+                <Card className="rounded-3xl border-zinc-800 bg-zinc-950">
+                  <CardContent className="p-5">
+                    <p className="mb-3 text-sm text-zinc-400">Üye Bilgileri</p>
+                    <div className="space-y-3 text-sm">
+                      <div><span className="text-zinc-500">Telefon:</span> <span className="text-white">{selectedMember.phone}</span></div>
+                      <div><span className="text-zinc-500">Paket:</span> <span className="text-white">{selectedMember.plan}</span></div>
+                      <div><span className="text-zinc-500">Başlangıç:</span> <span className="text-white">{selectedMember.startDate}</span></div>
+                      <div><span className="text-zinc-500">Bitiş:</span> <span className="text-white">{selectedMember.endDate}</span></div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="rounded-3xl border-zinc-800 bg-zinc-950">
+                  <CardContent className="p-5">
+                    <p className="mb-3 text-sm text-zinc-400">Durum ve Bakiye</p>
+                    <div className="space-y-3 text-sm">
+                      <div className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-yellow-400" /> <Badge className={statusFromEndDate(selectedMember.endDate) ? "bg-emerald-500/20 text-emerald-300" : "bg-red-500/20 text-red-300"}>{statusFromEndDate(selectedMember.endDate) ? "Aktif" : "Süresi Bitti"}</Badge></div>
+                      <div><span className="text-zinc-500">Bakiye:</span> <span className="text-white">{selectedMember.balance} ₺</span></div>
+                      <div><span className="text-zinc-500">Borç:</span> <span className="text-white">{selectedMember.debt} ₺</span></div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="rounded-3xl border-zinc-800 bg-zinc-950">
+                  <CardContent className="p-5">
+                    <p className="mb-3 text-sm text-zinc-400">Hızlı İşlemler</p>
+                    <div className="space-y-2">
+                      <Button onClick={() => { setSelectedMember(null); openEditMember(selectedMember); }} className="w-full rounded-2xl bg-blue-600 text-white hover:bg-blue-500"><Pencil className="mr-2 h-4 w-4" /> Düzenle</Button>
+                      <a href={`https://wa.me/${formatWhatsapp(selectedMember.phone)}`} target="_blank" rel="noreferrer" className="block">
+                        <Button className="w-full rounded-2xl bg-emerald-600 text-white hover:bg-emerald-500"><Phone className="mr-2 h-4 w-4" /> WhatsApp</Button>
+                      </a>
+                      <Button onClick={() => addPaymentForMember(selectedMember)} className="w-full rounded-2xl bg-yellow-500 text-black hover:bg-yellow-400"><BadgeDollarSign className="mr-2 h-4 w-4" /> Ödeme Ekle</Button>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-
-              <div>
-                <label>Telefon</label>
-                <input
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label>Paket</label>
-                <input
-                  value={form.plan}
-                  onChange={(e) => setForm({ ...form, plan: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label>Bakiye</label>
-                <input
-                  type="number"
-                  value={form.balance}
-                  onChange={(e) => setForm({ ...form, balance: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label>Başlangıç</label>
-                <input
-                  type="date"
-                  value={form.startDate}
-                  onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-                />
-              </div>
-
-              <div>
-                <label>Bitiş</label>
-                <input
-                  type="date"
-                  value={form.endDate}
-                  onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                />
-              </div>
-
-              <div className="full-width">
-                <label>Borç</label>
-                <input
-                  type="number"
-                  value={form.debt}
-                  onChange={(e) => setForm({ ...form, debt: e.target.value })}
-                />
-              </div>
-            </div>
-
-            <div className="row-actions top-gap">
-              <button className="ghost-btn" onClick={() => setShowModal(false)}>
-                İptal
-              </button>
-              <button className="primary-btn" onClick={saveMember}>
-                Kaydet
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              <Card className="mt-2 rounded-3xl border-zinc-800 bg-zinc-950">
+                <CardHeader>
+                  <CardTitle className="text-white">Ödeme Geçmişi</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto rounded-2xl border border-zinc-800">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-zinc-800 hover:bg-zinc-900">
+                          <TableHead className="text-zinc-300">Tutar</TableHead>
+                          <TableHead className="text-zinc-300">Tarih</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {memberPaymentHistory(selectedMember.name).length ? memberPaymentHistory(selectedMember.name).map((payment) => (
+                          <TableRow key={payment.id} className="border-zinc-800 hover:bg-zinc-950/70">
+                            <TableCell className="text-zinc-300">{payment.amount} ₺</TableCell>
+                            <TableCell className="text-zinc-300">{payment.date}</TableCell>
+                          </TableRow>
+                        )) : (
+                          <TableRow className="border-zinc-800">
+                            <TableCell className="text-zinc-500" colSpan={2}>Bu üyeye ait ödeme kaydı bulunmuyor.</TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
-  )
+  );
+}
+
+function StatCard({ title, value }) {
+  return (
+    <Card className="rounded-3xl border-zinc-800 bg-zinc-900">
+      <CardContent className="p-6">
+        <p className="text-sm text-zinc-400">{title}</p>
+        <h3 className="mt-2 text-3xl font-bold text-white">{value}</h3>
+      </CardContent>
+    </Card>
+  );
 }
